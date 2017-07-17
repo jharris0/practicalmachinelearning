@@ -126,7 +126,11 @@ $(document).ready(function () {
 
 <div id="introduction" class="section level2">
 <h2>Introduction</h2>
-<p>This report documents my attempt to build a machine learning model to identify whether a subject is performing a physical exercise activity correctly. The data is from the Weight Lifting Exercises Dataset, described at <a href="http://groupware.les.inf.puc-rio.br/har" class="uri">http://groupware.les.inf.puc-rio.br/har</a>. That page states: “Six young health participants were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different fashions: exactly according to the specification (Class A), throwing the elbows to the front (Class B), lifting the dumbbell only halfway (Class C), lowering the dumbbell only halfway (Class D) and throwing the hips to the front (Class E).” My goal, therefore, is to build a model that correctly predicts the class type for observations not in the original dataset.</p>
+<p>This report documents my attempt to build a machine learning model to identify whether a subject is performing a physical exercise activity correctly. The data is from the Weight Lifting Exercises Dataset, described at <a href="http://groupware.les.inf.puc-rio.br/har" class="uri">http://groupware.les.inf.puc-rio.br/har</a>. That page states:</p>
+<blockquote>
+<p>Six young health participants were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different fashions: exactly according to the specification (Class A), throwing the elbows to the front (Class B), lifting the dumbbell only halfway (Class C), lowering the dumbbell only halfway (Class D) and throwing the hips to the front (Class E).</p>
+</blockquote>
+<p>Data was collected using accelerometers placed on the participants’ bodies and the dumbbell. My goal, therefore, is to build a model that correctly predicts class type based on the accelerometer data.</p>
 </div>
 <div id="approach" class="section level2">
 <h2>Approach</h2>
@@ -134,27 +138,21 @@ $(document).ready(function () {
 </div>
 <div id="prepping-the-data" class="section level2">
 <h2>Prepping the Data</h2>
-<p>First, I loaded the data and made sure NAs were properly identified as such using the na.strings parameter of read.csv.</p>
+<p>First, I loaded the data and made sure NAs were properly identified using the na.strings parameter of read.csv.</p>
 <pre class="r"><code>pml.training &lt;- read.csv(&quot;pml-training.csv&quot;, na.strings = c(&quot;#DIV/0!&quot;,&quot;NA&quot;), stringsAsFactors = FALSE)</code></pre>
-<p>Next, I undertook a few different steps to prepare the data for model fitting.</p>
+<p>Next, I performed some additional steps to prepare the data for model fitting.</p>
 <div id="removing-variables-without-predictive-value" class="section level3">
 <h3>Removing Variables Without Predictive Value</h3>
 <p>The first seven variables were not accelerometer data. I felt they would not contribute predictive value to the model, so I removed them.</p>
-<pre class="r"><code>head(pml.training[,1:10])</code></pre>
-<pre><code>##   X user_name raw_timestamp_part_1 raw_timestamp_part_2   cvtd_timestamp
-## 1 1  carlitos           1323084231               788290 05/12/2011 11:23
-## 2 2  carlitos           1323084231               808298 05/12/2011 11:23
-## 3 3  carlitos           1323084231               820366 05/12/2011 11:23
-## 4 4  carlitos           1323084232               120339 05/12/2011 11:23
-## 5 5  carlitos           1323084232               196328 05/12/2011 11:23
-## 6 6  carlitos           1323084232               304277 05/12/2011 11:23
-##   new_window num_window roll_belt pitch_belt yaw_belt
-## 1         no         11      1.41       8.07    -94.4
-## 2         no         11      1.41       8.07    -94.4
-## 3         no         11      1.42       8.07    -94.4
-## 4         no         12      1.48       8.05    -94.4
-## 5         no         12      1.48       8.07    -94.4
-## 6         no         12      1.45       8.06    -94.4</code></pre>
+<pre class="r"><code>str(pml.training[1:7])</code></pre>
+<pre><code>## 'data.frame':    19622 obs. of  7 variables:
+##  $ X                   : int  1 2 3 4 5 6 7 8 9 10 ...
+##  $ user_name           : chr  &quot;carlitos&quot; &quot;carlitos&quot; &quot;carlitos&quot; &quot;carlitos&quot; ...
+##  $ raw_timestamp_part_1: int  1323084231 1323084231 1323084231 1323084232 1323084232 1323084232 1323084232 1323084232 1323084232 1323084232 ...
+##  $ raw_timestamp_part_2: int  788290 808298 820366 120339 196328 304277 368296 440390 484323 484434 ...
+##  $ cvtd_timestamp      : chr  &quot;05/12/2011 11:23&quot; &quot;05/12/2011 11:23&quot; &quot;05/12/2011 11:23&quot; &quot;05/12/2011 11:23&quot; ...
+##  $ new_window          : chr  &quot;no&quot; &quot;no&quot; &quot;no&quot; &quot;no&quot; ...
+##  $ num_window          : int  11 11 11 12 12 12 12 12 12 12 ...</code></pre>
 <pre class="r"><code>library(dplyr)
 data &lt;- select(pml.training, classe, 8:159)</code></pre>
 </div>
@@ -164,6 +162,8 @@ data &lt;- select(pml.training, classe, 8:159)</code></pre>
 <pre class="r"><code>NAmeans &lt;- apply(data, 2, function(x) sum(is.na(x))/length(x))
 colsToKeep &lt;- names(which(NAmeans &lt; 0.8))
 data &lt;- data[colsToKeep]
+
+# How many variables left?
 dim(data)</code></pre>
 <pre><code>## [1] 19622    53</code></pre>
 <p>I was left with 52 variables plus the “classe” variable. As it turns out, there were no NA values left in the remaining variables, so I did not need to impute data.</p>
@@ -173,12 +173,12 @@ sum(is.na(data))</code></pre>
 </div>
 <div id="outliers" class="section level3">
 <h3>Outliers</h3>
-<p>I looked for outlier values by running the summary function on the data and looking for variables with a large discrepancy between mean and median. Where such a discrepancy existed, I ran hist to view the distribution of values. I found a lot of non-normal distributions, but did not see any obviously incorrect or unlikely values. Because the values were recorded electronically from accelerometers, perhaps there was little possibility for human error in the data collecting/recording process. As I was pressed for time, I did not do any further work on outliers.</p>
+<p>I looked for outlier values by running the <code>summary</code> function on the data and looking for variables with a large discrepancy between mean and median. Where such a discrepancy existed, I ran <code>hist</code> to view the distribution of values. I found a lot of non-normal distributions, but did not see any obviously incorrect or unlikely values. Because the values were recorded electronically from accelerometers, perhaps there was little possibility for human error in the data collecting/recording process. As I was pressed for time, I did not do any further work on outliers.</p>
 </div>
 <div id="principle-components-analysis" class="section level3">
 <h3>Principle Components Analysis</h3>
 <p>I decided to use principle components analysis (PCA). Although PCA causes a loss of interpretability, this was not a concern as my goal was predictive accuracy, not inference. I chose to use PCA because (1) it results in a dataset with less noise, which typically helps reduce overfitting, and (2) I believed that reducing the number of variables using PCA would reduce computational complexity when fitting the models. This is important because my computer is underpowered.</p>
-<p>Rather than run PCA separately, I included it within the call to the train function for my models.</p>
+<p>Rather than run PCA separately, I included it within the call to the <code>train</code> function for my models.</p>
 </div>
 </div>
 <div id="cross-validation" class="section level2">
@@ -187,7 +187,7 @@ sum(is.na(data))</code></pre>
 </div>
 <div id="model-selection" class="section level2">
 <h2>Model Selection</h2>
-<p>I used the train function in the caret package to fit several different models using a variety of algorithms and parameters. Unfortunately, due to my computer’s limited processing power, some algorithm-parameter combinations took too long to fit and I had to eliminate them as options. In the end, I built three models from which I selected a best option.</p>
+<p>I used the <code>train</code> function in the caret package to fit several different models using a variety of algorithms and parameters. Unfortunately, due to my computer’s limited processing power, some algorithm-parameter combinations took too long to fit and I had to eliminate them as options. In the end, I built three models from which I selected a best option.</p>
 <pre class="r"><code>library(caret)
 set.seed(2017)
 

@@ -19,7 +19,11 @@ load(file = "model3.rda")
 
 ## Introduction
 
-This report documents my attempt to build a machine learning model to identify whether a subject is performing a physical exercise activity correctly. The data is from the Weight Lifting Exercises Dataset, described at http://groupware.les.inf.puc-rio.br/har. That page states: "Six young health participants were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different fashions: exactly according to the specification (Class A), throwing the elbows to the front (Class B), lifting the dumbbell only halfway (Class C), lowering the dumbbell only halfway (Class D) and throwing the hips to the front (Class E)." My goal, therefore, is to build a model that correctly predicts the class type for observations not in the original dataset.
+This report documents my attempt to build a machine learning model to identify whether a subject is performing a physical exercise activity correctly. The data is from the Weight Lifting Exercises Dataset, described at http://groupware.les.inf.puc-rio.br/har. That page states:
+
+> Six young health participants were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different fashions: exactly according to the specification (Class A), throwing the elbows to the front (Class B), lifting the dumbbell only halfway (Class C), lowering the dumbbell only halfway (Class D) and throwing the hips to the front (Class E).
+
+Data was collected using accelerometers placed on the participants' bodies and the dumbbell. My goal, therefore, is to build a model that correctly predicts class type based on the accelerometer data.
 
 ## Approach
 
@@ -40,7 +44,7 @@ Next, I performed some additional steps to prepare the data for model fitting.
 The first seven variables were not accelerometer data. I felt they would not contribute predictive value to the model, so I removed them.
 
 ```{r}
-head(pml.training[,1:10])
+str(pml.training[1:7])
 library(dplyr)
 data <- select(pml.training, classe, 8:159)
 ```
@@ -53,6 +57,8 @@ Next I wanted to eliminate NAs from the dataset by imputing data, if necessary. 
 NAmeans <- apply(data, 2, function(x) sum(is.na(x))/length(x))
 colsToKeep <- names(which(NAmeans < 0.8))
 data <- data[colsToKeep]
+
+# How many variables left?
 dim(data)
 ```
 
@@ -65,13 +71,13 @@ sum(is.na(data))
 
 ### Outliers
 
-I looked for outlier values by running the summary function on the data and looking for variables with a large discrepancy between mean and median. Where such a discrepancy existed, I ran hist to view the distribution of values. I found a lot of non-normal distributions, but did not see any obviously incorrect or unlikely values. Because the values were recorded electronically from accelerometers, perhaps there was little possibility for human error in the data collecting/recording process. As I was pressed for time, I did not do any further work on outliers.
+I looked for outlier values by running the `summary` function on the data and looking for variables with a large discrepancy between mean and median. Where such a discrepancy existed, I ran `hist` to view the distribution of values. I found a lot of non-normal distributions, but did not see any obviously incorrect or unlikely values. Because the values were recorded electronically from accelerometers, perhaps there was little possibility for human error in the data collecting/recording process. As I was pressed for time, I did not do any further work on outliers.
 
 ### Principle Components Analysis
 
 I decided to use principle components analysis (PCA). Although PCA causes a loss of interpretability, this was not a concern as my goal was predictive accuracy, not inference. I chose to use PCA because (1) it results in a dataset with less noise, which typically helps reduce overfitting, and (2) I believed that reducing the number of variables using PCA would reduce computational complexity when fitting the models. This is important because my computer is underpowered.
 
-Rather than run PCA separately, I included it within the call to the train function for my models.
+Rather than run PCA separately, I included it within the call to the `train` function for my models.
 
 ## Cross Validation
 
@@ -79,7 +85,7 @@ For cross validation, I decided to not split the training data into training and
 
 ## Model Selection
 
-I used the train function in the caret package to fit several different models using a variety of algorithms and parameters. Unfortunately, due to my computer's limited processing power, some algorithm-parameter combinations took too long to fit and I had to eliminate them as options. In the end, I built three models from which I selected a best option.
+I used the `train` function in the caret package to fit several different models using a variety of algorithms and parameters. Unfortunately, due to my computer's limited processing power, some algorithm-parameter combinations took too long to fit and I had to eliminate them as options. In the end, I built three models from which I selected a best option.
 
 ```{r eval=FALSE}
 library(caret)

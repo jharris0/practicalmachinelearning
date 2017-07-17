@@ -1,0 +1,126 @@
+---
+title: "Practical Machine Learning Course Project"
+author: "Jesse Harris"
+date: "July 16, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r warning=FALSE, message=FALSE, echo=FALSE}
+library(dplyr)
+library(caret)
+load(file = "model1.rda")
+load(file = "model2.rda")
+load(file = "model3.rda")
+```
+
+## Introduction
+
+This report documents my attempt to build a machine learning model to identify whether a subject is performing a physical exercise activity correctly. The data is from the Weight Lifting Exercises Dataset, described at http://groupware.les.inf.puc-rio.br/har. That page states: "Six young health participants were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different fashions: exactly according to the specification (Class A), throwing the elbows to the front (Class B), lifting the dumbbell only halfway (Class C), lowering the dumbbell only halfway (Class D) and throwing the hips to the front (Class E)." My goal, therefore, is to build a model that correctly predicts the class type for observations not in the original dataset.
+
+## Approach
+
+This is a multiclass classification problem, and the goal is prediction, not inference. With these factors in mind, I suspected that a boosting algorithm would hold the most promise for achieving maximum prediction accuracy.
+
+## Prepping the Data
+
+First, I loaded the data and made sure NAs were properly identified using the na.strings parameter of read.csv.
+
+```{r}
+pml.training <- read.csv("pml-training.csv", na.strings = c("#DIV/0!","NA"), stringsAsFactors = FALSE)
+```
+
+Next, I performed some additional steps to prepare the data for model fitting.
+
+### Removing Variables Without Predictive Value
+
+The first seven variables were not accelerometer data. I felt they would not contribute predictive value to the model, so I removed them.
+
+```{r}
+head(pml.training[,1:10])
+library(dplyr)
+data <- select(pml.training, classe, 8:159)
+```
+
+### Dealing with NAs
+
+Next I wanted to eliminate NAs from the dataset by imputing data, if necessary. To begin, I used the following code (taken from https://stackoverflow.com/questions/23597140/how-to-find-the-percentage-of-nas-in-a-data-frame-using-apply) to remove variables with over 80% NA values, as I thought it would be difficult to do reliable imputation with such a high ratio of NAs.
+
+```{r}
+NAmeans <- apply(data, 2, function(x) sum(is.na(x))/length(x))
+colsToKeep <- names(which(NAmeans < 0.8))
+data <- data[colsToKeep]
+dim(data)
+```
+
+I was left with 52 variables plus the "classe" variable. As it turns out, there were no NA values left in the remaining variables, so I did not need to impute data.
+
+```{r}
+# How many NAs left in remaining data?
+sum(is.na(data))
+```
+
+### Outliers
+
+I looked for outlier values by running the summary function on the data and looking for variables with a large discrepancy between mean and median. Where such a discrepancy existed, I ran hist to view the distribution of values. I found a lot of non-normal distributions, but did not see any obviously incorrect or unlikely values. Because the values were recorded electronically from accelerometers, perhaps there was little possibility for human error in the data collecting/recording process. As I was pressed for time, I did not do any further work on outliers.
+
+### Principle Components Analysis
+
+I decided to use principle components analysis (PCA). Although PCA causes a loss of interpretability, this was not a concern as my goal was predictive accuracy, not inference. I chose to use PCA because (1) it results in a dataset with less noise, which typically helps reduce overfitting, and (2) I believed that reducing the number of variables using PCA would reduce computational complexity when fitting the models. This is important because my computer is underpowered.
+
+Rather than run PCA separately, I included it within the call to the train function for my models.
+
+## Cross Validation
+
+For cross validation, I decided to not split the training data into training and test sets, and instead rely on k-fold cross validation during the model fitting process. My reason for this was to allocate as much data as possible for fitting the models, thus hopefully maximizing model accuracy.
+
+## Model Selection
+
+I used the train function in the caret package to fit several different models using a variety of algorithms and parameters. Unfortunately, due to my computer's limited processing power, some algorithm-parameter combinations took too long to fit and I had to eliminate them as options. In the end, I built three models from which I selected a best option.
+
+```{r eval=FALSE}
+library(caret)
+set.seed(2017)
+
+# Do k-fold cross validation, k = 10
+trainParams <- trainControl(method = "cv", number = 10)
+
+# Classification tree
+model1 <- train(classe ~ ., method = "rpart", trControl = trainParams, preProcess = c("pca"), data = data)
+
+# XG Boost
+model2 <- train(classe ~ ., method = "xgbTree", trControl = trainParams, preProcess = c("pca"), data = data)
+
+# Gradient boosting
+model3 <- train(classe ~ ., method = "gbm", trControl = trainParams, preProcess = c("pca"), data = data)
+```
+
+The model accuracy statistics were as follows:
+
+```{r message=FALSE}
+cm1 <- confusionMatrix(data$classe,predict(model1,data))
+cm2 <- confusionMatrix(data$classe,predict(model2,data))
+cm3 <- confusionMatrix(data$classe,predict(model3,data))
+results <- rbind(round(cm1$overall,3),round(cm2$overall,3),round(cm3$overall,3))
+row.names(results) <- c("Class. Tree","XG Boost","GBM")
+results[,1:5]
+```
+
+The XG Boost model ("xgbTree") had the highest accuracy value, so I decided to use it as my prediction model.
+
+## Out-of-Sample Error Rate Estimate
+
+Here are the accuracy measures for each fold of the final XG Boost model.
+
+```{r}
+model2$resample
+```
+
+Based on this and the fact that in-sample accuracy metrics are always higher than out-of-sample, I expect an out-of-sample error rate of about 15%, or an accuracy value of about 0.85.
+
+## Final Thoughts
+
+If I had had more time and a more powerful computer, I would have further explored tuning parameters for PCA and the algorithms. For example, I would have tried a lower threshold for PCA (the default appears to be 95% of variance), which would further reduce model complexity and potentially reduce overfitting. I also would have tried different tuning parameters for XG Boost to see their effect on accuracy.

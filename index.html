@@ -138,7 +138,7 @@ $(document).ready(function () {
 </div>
 <div id="prepping-the-data" class="section level2">
 <h2>Prepping the Data</h2>
-<p>First, I loaded the data and made sure NAs were properly identified using the na.strings parameter of read.csv.</p>
+<p>First, I loaded the data and made sure NAs were properly identified using the <code>na.strings</code> parameter of <code>read.csv</code>.</p>
 <pre class="r"><code>pml.training &lt;- read.csv(&quot;pml-training.csv&quot;, na.strings = c(&quot;#DIV/0!&quot;,&quot;NA&quot;), stringsAsFactors = FALSE)</code></pre>
 <p>Next, I performed some additional steps to prepare the data for model fitting.</p>
 <div id="removing-variables-without-predictive-value" class="section level3">

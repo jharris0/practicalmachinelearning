@@ -31,7 +31,7 @@ This is a multiclass classification problem, and the goal is prediction, not inf
 
 ## Prepping the Data
 
-First, I loaded the data and made sure NAs were properly identified using the na.strings parameter of read.csv.
+First, I loaded the data and made sure NAs were properly identified using the `na.strings` parameter of `read.csv`.
 
 ```{r}
 pml.training <- read.csv("pml-training.csv", na.strings = c("#DIV/0!","NA"), stringsAsFactors = FALSE)
